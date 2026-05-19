@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Goal Setting & Tracking Portal MVP
 
-## Getting Started
+An enterprise-ready SaaS prototype for organizational goal setting and tracking, built for Hackathons.
 
-First, run the development server:
+## Overview
+This platform allows:
+- **Employees** to create, manage, and submit quarterly goals (must equal 100% weightage).
+- **Managers** to review, approve, and reject team goals inline.
+- **Admins** to oversee organization-wide completion rates, quarterly trends, and goal lifecycle distributions using rich analytics.
 
+## Tech Stack
+- **Framework**: Next.js 15 (App Router, Server Actions)
+- **Database**: PostgreSQL (via Supabase) + Prisma ORM
+- **Authentication**: Auth.js (NextAuth v5) - Mocked credentials for demo purposes
+- **UI / Styling**: Tailwind CSS v4, shadcn/ui, Recharts
+- **Icons**: Lucide React
+
+## Local Setup
+
+### Prerequisites
+- Node.js >= 18
+- PostgreSQL Database
+
+### Installation
+
+1. Install dependencies
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Set up environment variables
+Create a `.env` file in the root:
+```env
+# Example using Supabase
+DATABASE_URL="postgresql://postgres.[ID]:[PASSWORD]@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.[ID]:[PASSWORD]@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres"
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="any-random-string-for-local-dev"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Initialize Database & Seed
+```bash
+npx prisma generate
+npx prisma db push
+npx prisma db seed
+```
 
-## Learn More
+4. Run the development server
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Demo Accounts
+The seed script provisions 3 mock accounts that require NO password (click to login):
+- **Employee**: `employee@demo.com`
+- **Manager**: `manager@demo.com` 
+- **Admin**: `admin@demo.com`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Features & Implementation Details
+- **Role-based Dashboards**: Conditional UI rendering based on the active user session.
+- **Form Validations**: Server-side validations using Zod schema for Goal constraints (Max 8, Min 10%, Total 100%).
+- **Interactive UI**: Leverages `sonner` for toast notifications and generic loading/submitting button states.
+- **Analytics**: Beautiful Recharts integration displaying real-time aggregated stats of the Prisma PostgreSQL database.

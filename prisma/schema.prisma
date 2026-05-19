@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum ThrustArea {
+  FINANCIAL
+  OPERATIONAL
+  CUSTOMER
+  PEOPLE
+  PEOPLE_AND_CULTURE
+  TECHNOLOGY
+}
+
+enum UoM {
+  NUMERIC_MIN
+  NUMERIC_MAX
+  PERCENT_MIN
+  PERCENT_MAX
+  TIMELINE
+  ZERO_BASED
+}
+
+enum GoalStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  LOCKED
+}
+
+enum CheckInQuarter {
+  Q1
+  Q2
+  Q3
+  Q4
+}
+
+enum CheckInStatus {
+  NOT_STARTED
+  ON_TRACK
+  COMPLETED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String?        @unique
+  image         String?
+  role          Role           @default(EMPLOYEE)
+  department    String?
+  managerId     String?
+  auditLogs     AuditLog[]
+  goals         Goal[]         @relation("GoalOwner")
+  manager       User?          @relation("ManagerReports", fields: [managerId], references: [id])
+  directReports User[]         @relation("ManagerReports")
+  notifications Notification[]
+
+  @@index([managerId])
+}
+
+model Goal {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  thrustArea  ThrustArea @default(OPERATIONAL)
+  uom         UoM        @default(NUMERIC_MIN)
+  target      String?
+  weightage   Int        @default(10)
+  status      GoalStatus @default(DRAFT)
+  ownerId     String
+  isShared    Boolean    @default(false)
+  isLocked    Boolean    @default(false)
+  parentId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  checkIns    CheckIn[]
+  owner       User       @relation("GoalOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  parent      Goal?      @relation("SharedGoal", fields: [parentId], references: [id])
+  children    Goal[]     @relation("SharedGoal")
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model CheckIn {
+  id                String         @id @default(cuid())
+  quarter           CheckInQuarter
+  actualAchievement String?
+  progress          Int            @default(0)
+  status            CheckInStatus  @default(NOT_STARTED)
+  employeeComment   String?
+  managerComment    String?
+  goalId            String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  goal              Goal           @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, quarter])
+  @@index([goalId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String
+  userId    String
+  details   String?
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  userId    String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
