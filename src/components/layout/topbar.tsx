@@ -118,7 +118,8 @@ export async function Topbar() {
             <DropdownMenuSeparator />
             <form action={async () => {
               "use server"
-              await signOut({ redirectTo: "/login" })
+              const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"
+              await signOut({ redirectTo: `${baseUrl}/login` })
             }}>
               <button className="w-full relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive">
                 <LogOut className="w-4 h-4" />
