@@ -21,6 +21,30 @@ export function SettingsClient({ users, approvedCount }: { users: User[]; approv
   const [locking, startLock] = useTransition()
   const [syncing, startSync] = useTransition()
   const [escalating, startEscalation] = useTransition()
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const response = await fetch("/api/reports/achievement")
+      if (!response.ok) throw new Error("Failed to export report")
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "achievement-report.csv"
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success("Achievement report downloaded successfully!")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to download report")
+    } finally {
+      setDownloading(false)
+    }
+  }
+
 
   function handleLockAll() {
     startLock(async () => {
@@ -97,13 +121,15 @@ export function SettingsClient({ users, approvedCount }: { users: User[]; approv
               {escalating ? "Running..." : "Run Escalation Engine"}
             </Button>
             <Button
+              onClick={handleDownload}
+              disabled={downloading}
               variant="outline"
-              className="w-full gap-2 text-xs h-9 p-0"
-              render={<a href="/api/reports/achievement" download className="w-full h-full flex items-center justify-center gap-2" />}
+              className="w-full gap-2 text-xs h-9"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald" />
-              Export Achievement Report
+              <FileSpreadsheet className={`w-3.5 h-3.5 text-emerald ${downloading ? "animate-bounce" : ""}`} />
+              {downloading ? "Exporting..." : "Export Achievement Report"}
             </Button>
+
           </CardContent>
         </Card>
 

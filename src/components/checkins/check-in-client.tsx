@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Target, ClipboardList, CheckCircle2, MessageSquare, Lock } from "lucide-react"
 import { motion } from "framer-motion"
+import { Confetti } from "@/components/ui/confetti"
+
 
 type CheckIn = {
   id: string
@@ -52,17 +54,49 @@ const statusColors: Record<string, string> = {
 
 function CheckInForm({ goal, quarter, existing }: { goal: Goal; quarter: Quarter; existing?: CheckIn }) {
   const [pending, startTransition] = useTransition()
+  const [showConfetti, setShowConfetti] = useState(false)
+
+  function playBeep() {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = "sine"
+      
+      // Happy tone chime
+      osc.frequency.setValueAtTime(523.25, audioCtx.currentTime) // C5
+      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08) // E5
+      osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16) // G5
+      
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35)
+      
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start()
+      osc.stop(audioCtx.currentTime + 0.4)
+    } catch (e) {
+      console.warn("Could not play notification sound:", e)
+    }
+  }
 
   function handleSubmit(fd: FormData) {
+    const status = fd.get("status") as string
     startTransition(async () => {
       try {
         await upsertCheckIn(goal.id, quarter, fd)
         toast.success(`${quarter} check-in saved!`)
+        playBeep()
+        if (status === "COMPLETED") {
+          setShowConfetti(true)
+          setTimeout(() => setShowConfetti(false), 3000)
+        }
       } catch (e: unknown) {
         toast.error((e as Error).message || "Failed to save check-in")
       }
     })
   }
+
 
   const uomLabels: Record<string, string> = {
     NUMERIC_MIN: "Number (Higher is Better)",
@@ -133,9 +167,12 @@ function CheckInForm({ goal, quarter, existing }: { goal: Goal; quarter: Quarter
         <CheckCircle2 className="w-4 h-4" />
         {pending ? "Saving..." : existing ? "Update Check-in" : "Submit Check-in"}
       </Button>
+
+      <Confetti active={showConfetti} />
     </form>
   )
 }
+
 
 export function CheckInClient({ goals }: { goals: Goal[] }) {
   const [activeQuarter, setActiveQuarter] = useState<Quarter>("Q3")

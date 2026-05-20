@@ -41,8 +41,9 @@ export async function unlockGoal(goalId: string) {
 
   await prisma.goal.update({
     where: { id: goalId },
-    data: { status: "APPROVED", isLocked: false }
+    data: { status: "DRAFT", isLocked: false }
   })
+
 
   await prisma.auditLog.create({
     data: {
@@ -103,17 +104,19 @@ export async function runEscalationEngine() {
     include: { manager: true }
   })
 
-  for (const user of usersWithNoGoals) {
-    if (user.managerId) {
-      await prisma.notification.create({
+  const notifications = usersWithNoGoals
+    .filter(user => user.managerId)
+    .map(user => 
+      prisma.notification.create({
         data: {
           type: "ESCALATION",
           message: `ESCALATION: ${user.name} has not submitted any goals for Phase 1.`,
-          userId: user.managerId,
+          userId: user.managerId!,
         }
       })
-    }
-  }
+    )
+  await Promise.all(notifications)
+
 
   await prisma.auditLog.create({
     data: {

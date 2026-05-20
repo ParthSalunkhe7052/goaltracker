@@ -5,6 +5,7 @@ import { createGoal, updateGoal, deleteGoal, submitGoals } from "@/app/actions/g
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { CircularProgress } from "@/components/ui/circular-progress"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -196,9 +197,11 @@ export function GoalList({ goals }: { goals: Goal[] }) {
         <div className="flex gap-2 shrink-0">
           {draftGoals.length > 0 && goals.length < 8 && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger render={<Button size="sm" variant="outline" className="gap-2 border-border" />}>
-              <PlusCircle className="w-4 h-4" /> Add Goal
-            </DialogTrigger>
+              <DialogTrigger render={
+                <Button size="sm" variant="outline" className="gap-2 border-border">
+                  <PlusCircle className="w-4 h-4" /> Add Goal
+                </Button>
+              } />
               <DialogContent className="sm:max-w-[480px] bg-card border-border">
                 <DialogHeader>
                   <DialogTitle className="text-foreground">Create New Goal</DialogTitle>
@@ -271,20 +274,21 @@ export function GoalList({ goals }: { goals: Goal[] }) {
                       <p className="text-xs text-muted-foreground line-clamp-2">{goal.description}</p>
                     )}
                     {latestCheckIn && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{latestCheckIn.quarter} Progress</span>
-                          <span className="font-semibold text-foreground">{latestCheckIn.progress}%</span>
+                      <div className="flex gap-4 items-start bg-muted/10 p-3 rounded-xl border border-border mt-2">
+                        <CircularProgress value={latestCheckIn.progress} size={44} strokeWidth={4} className="text-primary" />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="text-xs font-semibold text-foreground">{latestCheckIn.quarter} Progress Update</p>
+                          <p className="text-[10px] text-muted-foreground">Status: <span className="font-semibold text-primary">{latestCheckIn.status.replace('_', ' ')}</span></p>
+                          {latestCheckIn.managerComment && (
+                            <div className="mt-2 p-1.5 rounded-lg bg-card border border-border">
+                              <p className="text-[9px] text-muted-foreground font-bold mb-0.5">Manager feedback</p>
+                              <p className="text-xs text-muted-foreground">{latestCheckIn.managerComment}</p>
+                            </div>
+                          )}
                         </div>
-                        <Progress value={latestCheckIn.progress} className="h-1.5" />
-                        {latestCheckIn.managerComment && (
-                          <div className="mt-2 p-2 rounded-lg bg-muted/30 border border-border">
-                            <p className="text-[10px] text-muted-foreground font-semibold mb-0.5">Manager feedback</p>
-                            <p className="text-xs text-muted-foreground">{latestCheckIn.managerComment}</p>
-                          </div>
-                        )}
                       </div>
                     )}
+
                     {goal.status === "DRAFT" && !goal.isShared && (
                       <div className="flex justify-end gap-2 mt-auto pt-3 border-t border-border">
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground" onClick={() => setEditGoal(goal)}>
@@ -319,9 +323,11 @@ export function GoalList({ goals }: { goals: Goal[] }) {
           <h3 className="text-base font-semibold text-foreground">No goals yet</h3>
           <p className="text-sm text-muted-foreground mt-1">Create your first goal to start this quarter&apos;s tracker</p>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger render={<Button className="mt-5 gap-2 bg-primary hover:bg-primary/90 text-white" />}>
-              <PlusCircle className="w-4 h-4" /> Create First Goal
-            </DialogTrigger>
+            <DialogTrigger render={
+              <Button className="mt-5 gap-2 bg-primary hover:bg-primary/90 text-white">
+                <PlusCircle className="w-4 h-4" /> Create First Goal
+              </Button>
+            } />
             <DialogContent className="sm:max-w-[480px] bg-card border-border">
               <DialogHeader><DialogTitle>Create New Goal</DialogTitle></DialogHeader>
               <GoalForm onSubmit={handleCreate} remainingWeight={100} pending={creating} />

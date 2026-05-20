@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { ThrustArea, UoM } from "@prisma/client"
 
 async function verifyManager() {
   const session = await auth()
@@ -171,6 +172,22 @@ export async function updateGoalByManager(goalId: string, formData: FormData) {
   const weightage = Number(formData.get("weightage"))
   const target = formData.get("target") as string
 
+  if (isNaN(weightage) || weightage < 10) {
+    throw new Error("Goal weightage must be a number and at least 10%")
+  }
+
+  // Check that total weightage for the employee does not exceed 100%
+  const allGoals = await prisma.goal.findMany({
+    where: { ownerId: goal.ownerId, id: { not: goalId } }
+  })
+  const otherWeight = allGoals.reduce((sum, g) => sum + g.weightage, 0)
+  if (otherWeight + weightage > 100) {
+    throw new Error(`Total goal weightage cannot exceed 100%. The employee's other goals sum to ${otherWeight}%.`)
+  }
+
+  const oldGoal = await prisma.goal.findUnique({ where: { id: goalId } })
+  if (!oldGoal) throw new Error("Goal not found")
+
   await prisma.goal.update({
     where: { id: goalId },
     data: { title, weightage, target }
@@ -182,11 +199,23 @@ export async function updateGoalByManager(goalId: string, formData: FormData) {
       entity: "Goal",
       entityId: goalId,
       userId: managerId,
-      details: `Manager edited goal: ${title} (${weightage}%)`,
+      details: `Manager edited goal: "${oldGoal.title}" (${oldGoal.weightage}% weight, target "${oldGoal.target}") -> "${title}" (${weightage}% weight, target "${target}")`,
+    }
+  })
+
+
+  // Notify the employee
+  await prisma.notification.create({
+    data: {
+      type: "SYSTEM",
+      message: `Your manager has updated your goal: "${title}" (Weightage: ${weightage}%).`,
+      userId: goal.ownerId,
     }
   })
 
   revalidatePath("/dashboard/approvals")
+  revalidatePath("/dashboard/team")
+  revalidatePath("/dashboard")
   return { success: true }
 }
 
@@ -198,6 +227,33 @@ export async function pushSharedGoal(templateGoalId: string, employeeIds: string
   })
   
   if (!templateGoal) throw new Error("Template goal not found")
+
+  // Fetch all goals and user names for the selected employees in one go
+  const [employees, employeeGoals] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: employeeIds } },
+      select: { id: true, name: true }
+    }),
+    prisma.goal.findMany({
+      where: { ownerId: { in: employeeIds } }
+    })
+  ])
+
+  const employeeMap = new Map(employees.map(e => [e.id, e.name || e.id]))
+
+  // Validate limits for each employee
+  for (const empId of employeeIds) {
+    const goals = employeeGoals.filter(g => g.ownerId === empId)
+    const empName = employeeMap.get(empId) || empId
+    if (goals.length >= 8) {
+      throw new Error(`Employee ${empName} already has 8 goals (maximum capacity)`)
+    }
+    const currentWeight = goals.reduce((sum, g) => sum + g.weightage, 0)
+    if (currentWeight + 10 > 100) {
+      throw new Error(`Employee ${empName} cannot accept a new 10% shared goal (currently at ${currentWeight}% weightage)`)
+    }
+  }
+
 
   const creations = employeeIds.map(empId => 
     prisma.goal.create({
@@ -217,6 +273,18 @@ export async function pushSharedGoal(templateGoalId: string, employeeIds: string
   )
 
   await Promise.all(creations)
+
+  // Notify employees
+  const notifyPromises = employeeIds.map(empId =>
+    prisma.notification.create({
+      data: {
+        type: "SYSTEM",
+        message: `Your manager has pushed a shared goal: "${templateGoal.title}" (10% weightage).`,
+        userId: empId,
+      }
+    })
+  )
+  await Promise.all(notifyPromises)
 
   await prisma.auditLog.create({
     data: {
@@ -254,4 +322,45 @@ export async function lockGoal(goalId: string) {
 
   revalidatePath("/dashboard")
   return { success: true }
+}
+
+export async function createTemplateGoal(formData: FormData) {
+  const managerId = await verifyManager()
+
+  const title = formData.get("title") as string
+  const description = formData.get("description") as string
+  const thrustArea = formData.get("thrustArea") as ThrustArea
+  const uom = formData.get("uom") as UoM
+  const target = formData.get("target") as string
+
+  if (!title || !thrustArea || !uom || !target) {
+    throw new Error("Missing required fields")
+  }
+
+  const template = await prisma.goal.create({
+    data: {
+      title,
+      description: description || "",
+      thrustArea,
+      uom,
+      target,
+      weightage: 10,
+      status: "APPROVED",
+      ownerId: managerId,
+      isShared: false,
+    }
+  })
+
+  await prisma.auditLog.create({
+    data: {
+      action: "CREATE_TEMPLATE_GOAL",
+      entity: "Goal",
+      entityId: template.id,
+      userId: managerId,
+      details: `Created shared goal template: ${title}`,
+    }
+  })
+
+  revalidatePath("/dashboard/team")
+  return { success: true, id: template.id }
 }

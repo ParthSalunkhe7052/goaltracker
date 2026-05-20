@@ -52,9 +52,10 @@ export async function updateGoal(goalId: string, formData: FormData) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  const goal = await prisma.goal.findUnique({ where: { id: goalId } })
-  if (!goal || goal.ownerId !== session.user.id) throw new Error("Unauthorized")
-  if (goal.status !== "DRAFT" && goal.status !== "SUBMITTED") throw new Error("Goal cannot be edited in current status")
+  const oldGoal = await prisma.goal.findUnique({ where: { id: goalId } })
+  if (!oldGoal) throw new Error("Goal not found")
+  if (oldGoal.ownerId !== session.user.id) throw new Error("Unauthorized")
+  if (oldGoal.status !== "DRAFT" && oldGoal.status !== "SUBMITTED") throw new Error("Goal cannot be edited in current status")
 
   const data = Object.fromEntries(formData.entries())
   const parsed = goalSchema.parse(data)
@@ -71,6 +72,17 @@ export async function updateGoal(goalId: string, formData: FormData) {
     data: parsed
   })
 
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE_GOAL",
+      entity: "Goal",
+      entityId: goalId,
+      userId: session.user.id,
+      details: `Updated goal: "${oldGoal.title}" (${oldGoal.weightage}% weight, target "${oldGoal.target}") -> "${parsed.title}" (${parsed.weightage}% weight, target "${parsed.target}")`,
+    }
+  })
+
+
   revalidatePath("/dashboard/goals")
   revalidatePath("/dashboard")
   return { success: true }
@@ -86,6 +98,17 @@ export async function deleteGoal(goalId: string) {
   if (goal.status !== "DRAFT") throw new Error("Only draft goals can be deleted")
 
   await prisma.goal.delete({ where: { id: goalId } })
+
+  await prisma.auditLog.create({
+    data: {
+      action: "DELETE_GOAL",
+      entity: "Goal",
+      entityId: goalId,
+      userId: session.user.id,
+      details: `Deleted goal: "${goal.title}" (${goal.weightage}% weight, target "${goal.target}")`,
+    }
+  })
+
   revalidatePath("/dashboard/goals")
   revalidatePath("/dashboard")
   return { success: true }
@@ -149,19 +172,24 @@ function calculateProgress(uom: string, target: string, actual: string): number 
     const t = parseFloat(target)
     const a = parseFloat(actual)
 
+    if (isNaN(t) || isNaN(a)) return 0
+
     switch (uom) {
-      case "NUMERIC_MIN":
-      case "PERCENT_MIN":
-        return Math.min(Math.round((a / t) * 100), 100)
       case "NUMERIC_MAX":
       case "PERCENT_MAX":
-        return Math.min(Math.round((t / a) * 100), 100)
+        if (t === 0) return a >= 0 ? 100 : 0
+        return Math.max(0, Math.min(Math.round((a / t) * 100), 100))
+      case "NUMERIC_MIN":
+      case "PERCENT_MIN":
+        if (a <= t) return 100
+        return Math.max(0, Math.min(Math.round((t / a) * 100), 100))
       case "ZERO_BASED":
         return a === 0 ? 100 : 0
       case "TIMELINE":
         // Assuming target and actual are ISO date strings
         const targetDate = new Date(target).getTime()
         const actualDate = new Date(actual).getTime()
+        if (isNaN(targetDate) || isNaN(actualDate)) return 0
         return actualDate <= targetDate ? 100 : 0
       default:
         return 0

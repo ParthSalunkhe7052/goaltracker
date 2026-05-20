@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Target, TrendingUp, CheckCircle2, Users, Clock, AlertCircle, BarChart3, FileText, Zap } from "lucide-react"
 import Link from "next/link"
+import { getActiveQuarterWindow } from "@/lib/utils"
+import { CircularProgress } from "@/components/ui/circular-progress"
+
 
 function StatCard({ title, value, sub, icon: Icon, accent = "primary" }: {
   title: string; value: string | number; sub?: string
@@ -44,6 +47,10 @@ export default async function DashboardPage() {
   const session = await auth()
   const role = session?.user?.role
 
+  const activeQuarter = getActiveQuarterWindow()
+  const activeLabel = activeQuarter === "GOAL_SETTING" ? "Goal Setting Phase" : activeQuarter ? `${activeQuarter} Check-in` : "Q3 2026 (Demo)"
+
+
   // ── EMPLOYEE ──
   if (role === "EMPLOYEE") {
     const [goals, unread] = await Promise.all([
@@ -69,7 +76,8 @@ export default async function DashboardPage() {
               Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"},{" "}
               <span className="gradient-text">{session?.user?.name?.split(" ")[0]}</span> 👋
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm">Q3 2026 is active. Here&apos;s your goal overview.</p>
+            <p className="text-muted-foreground mt-1 text-sm">{activeLabel} is active. Here&apos;s your goal overview.</p>
+
           </div>
           {unread > 0 && (
             <Link href="/dashboard/notifications" className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary font-semibold hover:bg-primary/20 transition-colors">
@@ -138,11 +146,11 @@ export default async function DashboardPage() {
                       <div className="flex items-center gap-4 mt-1">
                         <span className="text-xs text-muted-foreground">{goal.weightage}% weight</span>
                         {latestCheckIn && (
-                          <div className="flex items-center gap-2 flex-1">
-                            <Progress value={latestCheckIn.progress} className="h-1 flex-1 max-w-24" />
-                            <span className="text-xs text-muted-foreground">{latestCheckIn.progress}%</span>
+                          <div className="flex items-center gap-2 shrink-0 ml-auto">
+                            <CircularProgress value={latestCheckIn.progress} size={30} strokeWidth={3.2} />
                           </div>
                         )}
+
                       </div>
                     </div>
                   </div>
@@ -174,7 +182,8 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
             Manager Dashboard
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Q3 2026 · Team of {team.length} reports</p>
+          <p className="text-muted-foreground mt-1 text-sm">{activeLabel} · Team of {team.length} reports</p>
+
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -266,7 +275,8 @@ export default async function DashboardPage() {
       <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Organization-wide analytics · Q3 2026</p>
+          <p className="text-muted-foreground mt-1 text-sm">Organization-wide analytics · {activeLabel}</p>
+
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
